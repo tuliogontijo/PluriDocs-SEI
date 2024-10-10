@@ -1,4 +1,4 @@
-import { specialChars, normalChars } from '../util/encodingTables.js';
+import { normalChars, specialChars } from '../util/encodingTables.js';
 
 let dataDocs = [];
 let dynamicFields = [];
@@ -291,7 +291,7 @@ export const printDataCrossing = () => {
       </div>
       </div>
       `
-        : getSeiVersion().includes("4.0.9") || getSeiVersion().startsWith("4.1") ?
+        :/^4\.1|^4\.0\.(9|12)/.test(getSeiVersion()) ?
           `<hr style="all:revert">
       <div>
         <p>Nome do documento na árvore de processos*</p>
@@ -436,6 +436,8 @@ const selectDocType = async (urlExpandDocList) => {
   let urlFormNewDoc;
   let idSerie = '';
 
+  let params = {};
+
   if (getSeiVersion().startsWith("4.1")) {
     urlFormNewDoc = $(htmlExpandedDocList).find('#frmDocumentoEscolherTipo').attr('action');
     success = typeList.some((type) => {
@@ -444,9 +446,8 @@ const selectDocType = async (urlExpandDocList) => {
         idSerie = str.substring(str.indexOf("(") + 1, str.indexOf(")"));
         return true;
       }
-    })
+    }) 
 
-    let params = {};
 
     $(htmlExpandedDocList).find('input[type="hidden"]').each((i, elem) => {
       params[$(elem).attr('id')] = $(elem).val();
@@ -470,11 +471,12 @@ const selectDocType = async (urlExpandDocList) => {
     return {
       urlFormNewDoc,
       success,
+      params
     };
   }
 
 }
-const formNewDoc = async (urlFormNewDoc, params0 = {}, data) => {
+const formNewDoc = async (urlFormNewDoc, params0, data) => {
 
   let htmlFormNewDoc;
 
@@ -554,8 +556,11 @@ const confirmDocData = async (urlConfirmDocData, params) => {
     else if (getSeiVersion().startsWith("4.1")) {
       urlEditor = lines.filter((line) => line.includes(`var linkEditarConteudo = 'controlador.php?acao=editor_montar`))[0].match(/'(.+?)'/)[0].replaceAll("'", "");;
     }
-  } catch {
-    throw new Error('versão do SEI incompatível');
+    else {
+      throw new Error('versão do SEI incompatível');
+    }
+  } catch(e) {
+    console.error(e);
   }
 
 
