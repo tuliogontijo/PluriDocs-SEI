@@ -1,4 +1,4 @@
-import * as functions from '../functions/functions.js'
+import * as functions from '../functions/functions.js';
 
 const ModalSelecaoBaseDados = () => {
   $('body').append(`
@@ -26,7 +26,7 @@ const ModalSelecaoBaseDados = () => {
         click: () => {
           $('#baseDados small').remove();
           const file = $("#inputBD")[0].files[0];
-          
+
           if (file.name.substring(file.name.lastIndexOf("."), file.name.length).toLocaleLowerCase().trim() === ".csv") {
             functions.CSVAnalysis($("#inputBD")[0].files[0]);
             $('#analiseCSV').dialog('open');
@@ -68,8 +68,12 @@ const ModalSelecaoBaseDados = () => {
   });
 
   $("#inputBD").change(() => {
-    $("#btnEnviaCSV").prop('disabled', false).removeClass('ui-button-disabled ui-state-disabled');
+    if ($("#inputBD").val())
+      $("#btnEnviaCSV").prop('disabled', false).removeClass('ui-button-disabled ui-state-disabled');
+    else
+      $("#btnEnviaCSV").prop('disabled', true).addClass('ui-button-disabled ui-state-disabled');
   })
+
 
 }
 

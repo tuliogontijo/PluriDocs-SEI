@@ -8,6 +8,7 @@ let dataCrossing = []
 let selectedModel = {};
 let CSVFileName = '';
 let docsNames = '';
+let descricaoDoc = '';
 let aborted = false;
 let flagError = false;
 let flagConfirmSpecialChars = false;
@@ -172,13 +173,16 @@ const fillModelAnalysis = (matches, selectedDoc) => {
 
 export const detectEncodingCSV = () => {
   $("#inputBD").on("change", function () {
-    const file = $(this)[0].files[0];
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      let csvResult = e.target.result.split(/\r|\n|\r\n/);
-      $("#inputBD").attr('encoding', jschardet.detect(csvResult.toString()).encoding.toLowerCase());
+    if ($(this)[0].files[0]) {
+      const file = $(this)[0].files[0];
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        let csvResult = e.target.result.split(/\r|\n|\r\n/);
+        $("#inputBD").attr('encoding', jschardet.detect(csvResult.toString()).encoding.toLowerCase());
+      }
+
+      reader.readAsBinaryString(file);
     }
-    reader.readAsBinaryString(file);
   });
 }
 
@@ -291,12 +295,20 @@ export const printDataCrossing = () => {
       </div>
       </div>
       `
-        :/^4\.1|^4\.0\.(9|12)/.test(getSeiVersion()) ?
+        : /^4\.1|^4\.0\.(9|12)/.test(getSeiVersion()) ?
           `<hr style="all:revert">
       <div>
-        <p>Nome do documento na árvore de processos*</p>
+        <p>Selecione a coluna que contém o valor para o <strong>NOME DO DOCUMENTO</strong> na árvore de processos*</p>
         <select id="nomesDoc">${selectData}</select>
-        <small>*Somente alguns tipos de documentos suportam</small>
+        <small style="font-size:0.7rem">*Somente alguns tipos de documentos suportam</small>
+      </div>
+      <hr style="all:revert">
+      <div>
+        <p>Selecione a coluna que contém o valor para <strong>DESCRIÇÃO DO DOCUMENTO</strong></p>
+        <select id="descricaoDoc">
+        ${selectData}
+        <option value="0">Não preencher o campo "Descrição" do documento</option>
+        </select>
       </div>
       </div>
       `: ""}`)
@@ -318,6 +330,12 @@ const adjustModalPosition = label => {
 
 export const getDocsNames = () => {
   docsNames = $('#nomesDoc').val();
+}
+
+export const getDescricaoDoc = () => {
+  const val = $('#descricaoDoc').val();
+  if (val === "0") return;
+  descricaoDoc = val
 }
 
 export const execute = async () => {
@@ -446,7 +464,7 @@ const selectDocType = async (urlExpandDocList) => {
         idSerie = str.substring(str.indexOf("(") + 1, str.indexOf(")"));
         return true;
       }
-    }) 
+    })
 
 
     $(htmlExpandedDocList).find('input[type="hidden"]').each((i, elem) => {
@@ -519,9 +537,14 @@ const formNewDoc = async (urlFormNewDoc, params0, data) => {
   params.rdoNivelAcesso = '0';
   params.hdnFlagDocumentoCadastro = '2';
   params.txaObservacoes = '';
-  params.txtDescricao = '';
-  params.txtProtocoloDocumentoTextoBase = selectedModel.numero;
+
   const regex = new RegExp(Object.keys(normalChars).join('|'), 'g');
+  if (descricaoDoc) {
+    params.txtDescricao = data[descricaoDoc].replace(regex, (match) => normalChars[match]).substring(0, 50);;
+  } else {
+    params.txtDescricao = '';
+  }
+  params.txtProtocoloDocumentoTextoBase = selectedModel.numero;
 
   if (!numeroOpcional | forceNames) {
     params.txtNumero = data[docsNames].replace(regex, (match) => normalChars[match]).substring(0, 50);
@@ -559,7 +582,7 @@ const confirmDocData = async (urlConfirmDocData, params) => {
     else {
       throw new Error('versão do SEI incompatível');
     }
-  } catch(e) {
+  } catch (e) {
     console.error(e);
   }
 

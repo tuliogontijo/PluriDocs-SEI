@@ -1,4 +1,4 @@
-import * as functions from '../functions/functions.js'
+import * as functions from '../functions/functions.js';
 
 const ModalCruzamentoDados = () => {
   $('body').append(`
@@ -27,6 +27,7 @@ const ModalCruzamentoDados = () => {
           $(this).dialog("close");
           $('#execucao').dialog("open");
           functions.getDocsNames();
+          functions.getDescricaoDoc();
           functions.execute();
           functions.clearInputs();
         }
