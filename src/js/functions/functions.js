@@ -15,7 +15,7 @@ let flagConfirmSpecialChars = false;
 let forceNames = false;
 
 export const setSeiVersion = () => {
-  const logoSeiTitle = $(`img[title^=Sistema]`).attr('title')
+  const logoSeiTitle = $(`img[title^=Sistema]`).attr('title').trim();
   const version = logoSeiTitle.substring(logoSeiTitle.lastIndexOf(" ") + 1, logoSeiTitle.length);
 
   localStorage.setItem('versaoSei', version);
@@ -295,7 +295,7 @@ export const printDataCrossing = () => {
       </div>
       </div>
       `
-        : /^4\.1|^4\.0\.(9|12)/.test(getSeiVersion()) ?
+        : /^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion()) ?
           `<hr style="all:revert">
       <div>
         <p>Selecione a coluna que contém o valor para o <strong>NOME DO DOCUMENTO</strong> na árvore de processos*</p>
@@ -342,7 +342,7 @@ export const execute = async () => {
 
   aborted = false;
 
-  const idIframe = getSeiVersion().startsWith("4.1") ? "#ifrConteudoVisualizacao" : "#ifrVisualizacao";
+  const idIframe = /^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion()) ? "#ifrConteudoVisualizacao" : "#ifrVisualizacao";
 
   const urlNewDoc = $(idIframe).contents().find("img[alt='Incluir Documento'").parent().attr('href');
 
@@ -456,7 +456,7 @@ const selectDocType = async (urlExpandDocList) => {
 
   let params = {};
 
-  if (getSeiVersion().startsWith("4.1")) {
+  if (/^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion())) {
     urlFormNewDoc = $(htmlExpandedDocList).find('#frmDocumentoEscolherTipo').attr('action');
     success = typeList.some((type) => {
       if (selectedModel.nome.startsWith(type.nome)) {
@@ -498,7 +498,7 @@ const formNewDoc = async (urlFormNewDoc, params0, data) => {
 
   let htmlFormNewDoc;
 
-  if (getSeiVersion().startsWith('4.1')) {
+  if (/^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion())) {
     htmlFormNewDoc = await $.ajax({
       method: 'POST',
       url: urlFormNewDoc,
@@ -568,6 +568,7 @@ const confirmDocData = async (urlConfirmDocData, params) => {
   })
 
   const lines = htmlDocCreated.split('\n');
+
   let urlEditor = '';
   try {
     if (getSeiVersion().startsWith("3")) {
@@ -576,10 +577,11 @@ const confirmDocData = async (urlConfirmDocData, params) => {
     else if (getSeiVersion().startsWith("4.0")) {
       urlEditor = lines.filter((line) => line.includes(`infraAbrirJanela('controlador.php?acao=editor_montar`))[0].match(/'(.+?)'/)[0].replaceAll("'", "");;
     }
-    else if (getSeiVersion().startsWith("4.1")) {
+    else if (/^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion())) {
       urlEditor = lines.filter((line) => line.includes(`var linkEditarConteudo = 'controlador.php?acao=editor_montar`))[0].match(/'(.+?)'/)[0].replaceAll("'", "");;
     }
     else {
+      
       throw new Error('versão do SEI incompatível');
     }
   } catch (e) {
