@@ -295,7 +295,7 @@ export const printDataCrossing = () => {
       </div>
       </div>
       `
-        : /^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion()) ?
+        : /^4\.1|^5/.test(getSeiVersion()) ?
           `<hr style="all:revert">
       <div>
         <p>Selecione a coluna que contém o valor para o <strong>NOME DO DOCUMENTO</strong> na árvore de processos*</p>
@@ -342,7 +342,7 @@ export const execute = async () => {
 
   aborted = false;
 
-  const idIframe = /^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion()) ? "#ifrConteudoVisualizacao" : "#ifrVisualizacao";
+  const idIframe = /^4\.1|^5/.test(getSeiVersion()) ? "#ifrConteudoVisualizacao" : "#ifrVisualizacao";
 
   const urlNewDoc = $(idIframe).contents().find("img[alt='Incluir Documento'").parent().attr('href');
 
@@ -384,7 +384,7 @@ Deseja continuar ?
 
       const response5 = await editDocContent(response4.urlEditor, CSVData[i]);
 
-      const response6 = await saveDoc(response5.urlSubmitForm, response5.paramsSaveDoc);
+      const response6 = await saveDoc(response5.urlSubmitForm, response5.paramsSaveDoc, response5.isEditorNovo);
 
       response6.success && $('#progress').html(`<p style="text-align:center">${i + 1}/${CSVData.length}</p>`);
 
@@ -456,7 +456,7 @@ const selectDocType = async (urlExpandDocList) => {
 
   let params = {};
 
-  if (/^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion())) {
+  if (/^4\.1|^5/.test(getSeiVersion())) {
     urlFormNewDoc = $(htmlExpandedDocList).find('#frmDocumentoEscolherTipo').attr('action');
     success = typeList.some((type) => {
       if (selectedModel.nome.startsWith(type.nome)) {
@@ -498,7 +498,7 @@ const formNewDoc = async (urlFormNewDoc, params0, data) => {
 
   let htmlFormNewDoc;
 
-  if (/^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion())) {
+  if (/^4\.1|^5/.test(getSeiVersion())) {
     htmlFormNewDoc = await $.ajax({
       method: 'POST',
       url: urlFormNewDoc,
@@ -577,11 +577,11 @@ const confirmDocData = async (urlConfirmDocData, params) => {
     else if (getSeiVersion().startsWith("4.0")) {
       urlEditor = lines.filter((line) => line.includes(`infraAbrirJanela('controlador.php?acao=editor_montar`))[0].match(/'(.+?)'/)[0].replaceAll("'", "");;
     }
-    else if (/^4\.1|^4\.0\.(9|12)|^5/.test(getSeiVersion())) {
+    else if (/^4\.1|^5/.test(getSeiVersion())) {
       urlEditor = lines.filter((line) => line.includes(`var linkEditarConteudo = 'controlador.php?acao=editor_montar`))[0].match(/'(.+?)'/)[0].replaceAll("'", "");;
     }
     else {
-      
+
       throw new Error('versão do SEI incompatível');
     }
   } catch (e) {
@@ -599,51 +599,114 @@ const confirmDocData = async (urlConfirmDocData, params) => {
 }
 const editDocContent = async (urlEditor, data) => {
 
-  const htmlEditor = await $.get(urlEditor);
-
-  const urlSubmitForm = $(htmlEditor).filter((_, el) => $(el).attr('id') === 'frmEditor').attr('action');
-
-  const textAreas = $(htmlEditor).find('div#divEditores textarea');
-
   const regex1 = new RegExp(dataCrossing.map((data) => `##${data}##`).join('|'), 'g');
   const regex2 = new RegExp(Object.keys(specialChars).join('|'), 'g');
 
-  const textAreasReplaced = textAreas.map((_, el) =>
-    $(el).text().replace(regex1, (match) =>
-      data[match.substring(2, match.length - 2)].replace(regex2, (match) => specialChars[match])
-    )
-  )
+  const htmlEditor = await $.get(urlEditor);
 
+  let urlSubmitForm = '';
   let paramsSaveDoc = {};
-  textAreasReplaced.each((i, textArea) => {
-    paramsSaveDoc[$(textAreas).eq(i).attr('name')] = textArea;
-  });
 
-  $(htmlEditor).find('input[type=hidden').each((_, input) => {
-    if (!$(input).attr('name').toLowerCase().includes('unidade'))
-      paramsSaveDoc[$(input).attr('name')] = $(input).val().replace(regex2, (match) => specialChars[match]);
-  })
+  // A versão do SEI não distingue os editores: uma mesma 5.0.4 pode servir o
+  // editor clássico (form #frmEditor) ou o editor novo, que injeta o objeto
+  // window.INFRA_EDITOR_CONFIG. Detectamos pelo conteúdo do HTML, não pela versão.
+  const termoInicial = 'window.INFRA_EDITOR_CONFIG = ';
+  const isEditorNovo = htmlEditor.includes(termoInicial);
+
+  if (!isEditorNovo) {
+
+    // Envolve o HTML num container para que #frmEditor, textareas e inputs
+    // sejam sempre descendentes. Ao passar um documento completo para $(),
+    // o jQuery achata os nós: dependendo do markup, #frmEditor pode virar nó
+    // de topo (não encontrado por .find()) em vez de descendente.
+    const $editor = $('<div>').append($.parseHTML(htmlEditor));
+
+    urlSubmitForm = $editor.find('#frmEditor').attr('action');
+
+    const textAreas = $editor.find('div#divEditores textarea');
+
+    const textAreasReplaced = textAreas.map((_, el) =>
+      $(el).text().replace(regex1, (match) =>
+        data[match.substring(2, match.length - 2)].replace(regex2, (match) => specialChars[match])
+      )
+    )
+
+    textAreasReplaced.each((i, textArea) => {
+      paramsSaveDoc[$(textAreas).eq(i).attr('name')] = textArea;
+    });
+
+    $editor.find('input[type=hidden').each((_, input) => {
+      if (!$(input).attr('name').toLowerCase().includes('unidade'))
+        paramsSaveDoc[$(input).attr('name')] = $(input).val().replace(regex2, (match) => specialChars[match]);
+    })
+
+  } else {//editor novo (INFRA_EDITOR_CONFIG)
+
+    const startIndex = htmlEditor.indexOf(termoInicial) + termoInicial.length;
+    const endIndex = htmlEditor.indexOf(';</script>', startIndex);
+    const jsonString = htmlEditor.substring(startIndex, endIndex);
+
+    const editorConfig = JSON.parse(jsonString);
+
+    const initialData = editorConfig.initialData;
+
+    urlSubmitForm = editorConfig.sei.urlSalvar;
+
+    let secoesConteudo = [];
+    Object.keys(initialData).forEach((key) => secoesConteudo.push({
+      "nome": key,
+      "html": initialData[key].replace(regex1, (match) => data[match.substring(2, match.length - 2)].replace(regex2, (match) => specialChars[match]))
+    }))
+
+    const payload = {
+      "secoesConteudo": secoesConteudo,
+      "ignorarNovaVersao": "S",
+      "versao": 2,
+      "comentarios": {
+        "itens": [],
+        "hashPosicoes": null
+      },
+    }
+
+    paramsSaveDoc = JSON.stringify(payload);
+  }
 
   if (aborted) throw new Error("cancel");
   return {
     urlSubmitForm,
     paramsSaveDoc,
+    isEditorNovo,
     success: true
   }
 
 }
-const saveDoc = async (urlSubmitForm, paramsSaveDoc) => {
-  const responseSave = await $.ajax({
+const saveDoc = async (urlSubmitForm, paramsSaveDoc, isEditorNovo) => {
+
+  
+  const options = {
     method: 'POST',
     url: urlSubmitForm,
     data: paramsSaveDoc,
-  })
+  };
+
+  if (isEditorNovo) {
+    options.dataType = "json";
+    options.contentType = "application/json; charset=utf-8";
+  }
+
+  const responseSave = await $.ajax(options);
+
   if (aborted) throw new Error("cancel");
 
-  if (responseSave.startsWith("OK")) {
+
+  if (isEditorNovo) {
     return { success: true }
-  } else {
-    throw new Error(responseSave);
+  } else if (responseSave.startsWith("OK")) {
+    return { success: true }
+  }
+  else {
+    //return { success: true }
+    throw new Error('Erro');
   }
 
 }
